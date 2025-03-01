@@ -114,7 +114,10 @@ if __name__ == '__main__':
     # total start time for throughput calculation
     total_start_event.record()
 
-    for i in range(1000):
+    # start recording memory
+    torch.cuda.memory._record_memory_history()
+
+    for i in range(100):
         # CUDA events for accurate profiling
         model_start_event = torch.cuda.Event(enable_timing=True)
         model_end_event = torch.cuda.Event(enable_timing=True)
@@ -138,6 +141,16 @@ if __name__ == '__main__':
         mvcpu_end_event.record()
         torch.cuda.synchronize()
         output_to_host_times.append((mvcpu_start_event.elapsed_time(mvcpu_end_event)) * 1e6)
+
+        try:
+            # snapshot memory after each trial
+            torch.cuda.memory._dump_snapshot(f"{i}.pickle")
+        except Exception as e:
+            print(f"Failed to capture memory snapshot {i}: {e}")
+
+
+    # stop recording memory
+    torch.cuda.memory._record_memory_history(enabled=None)
 
     # total end time for throughput calculation
     total_end_event.record()
