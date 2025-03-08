@@ -122,22 +122,25 @@ if __name__=="__main__":
     embeddings_to_host_times = []
     hidden_states_to_host_times = []
 
-    total_start_event = torch.cuda.Event(enable_timing=True)
-    total_end_event = torch.cuda.Event(enable_timing=True)
+    # total_start_event = torch.cuda.Event(enable_timing=True)
+    # total_end_event = torch.cuda.Event(enable_timing=True)
 
     # total start time for throughput calculation
-    total_start_event.record()
+    # total_start_event.record()
+
+    # start recording memory
+    torch.cuda.memory._record_memory_history()
 
     for i in range(1000):
         # CUDA events for accurate profiling
-        mvgpu_start_event = torch.cuda.Event(enable_timing=True)
-        mvgpu_end_event = torch.cuda.Event(enable_timing=True)
-        model_start_event = torch.cuda.Event(enable_timing=True)
-        model_end_event = torch.cuda.Event(enable_timing=True)
-        embeddings_start_event = torch.cuda.Event(enable_timing=True)
-        embeddings_end_event = torch.cuda.Event(enable_timing=True)
-        hstates_start_event = torch.cuda.Event(enable_timing=True)
-        hstates_end_event = torch.cuda.Event(enable_timing=True)
+        # mvgpu_start_event = torch.cuda.Event(enable_timing=True)
+        # mvgpu_end_event = torch.cuda.Event(enable_timing=True)
+        # model_start_event = torch.cuda.Event(enable_timing=True)
+        # model_end_event = torch.cuda.Event(enable_timing=True)
+        # embeddings_start_event = torch.cuda.Event(enable_timing=True)
+        # embeddings_end_event = torch.cuda.Event(enable_timing=True)
+        # hstates_start_event = torch.cuda.Event(enable_timing=True)
+        # hstates_end_event = torch.cuda.Event(enable_timing=True)
 
         pixel_values = []
         for img in list_of_images:
@@ -146,65 +149,75 @@ if __name__=="__main__":
         pixel_values = torch.stack(pixel_values, dim=0)
 
         # time before put to GPU
-        mvgpu_start_event.record()
+        # mvgpu_start_event.record()
         # Forward the vision encoder
         pixel_values = pixel_values.to('cuda')
         # time after put to GPU
-        mvgpu_end_event.record()
-        torch.cuda.synchronize()
-        load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6) # Convert ms to ns
+        # mvgpu_end_event.record()
+        # torch.cuda.synchronize()
+        # load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6) # Convert ms to ns
 
         # time before running model
-        model_start_event.record()
+        # model_start_event.record()
         vision_embeddings, vision_second_last_layer_hidden_states = stepb.StepB_output(pixel_values, batch_size)
         # time after running model
-        model_end_event.record()
-        torch.cuda.synchronize()
-        run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
+        # model_end_event.record()
+        # torch.cuda.synchronize()
+        # run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
 
         # time before transferring vision embeddings to CPU
-        embeddings_start_event.record()
+        # embeddings_start_event.record()
         vision_embeddings.cpu()
         # time after transferring vision embeddings to CPU
-        embeddings_end_event.record()
-        torch.cuda.synchronize()
-        embeddings_to_host_times.append((embeddings_start_event.elapsed_time(embeddings_end_event)) * 1e6)
+        # embeddings_end_event.record()
+        # torch.cuda.synchronize()
+        # embeddings_to_host_times.append((embeddings_start_event.elapsed_time(embeddings_end_event)) * 1e6)
 
         # time before transferring hidden states to CPU
-        hstates_start_event.record()
+        # hstates_start_event.record()
         vision_second_last_layer_hidden_states.cpu()
         # time after transferring hidden states to CPU
-        hstates_end_event.record()
-        torch.cuda.synchronize()
-        hidden_states_to_host_times.append((hstates_start_event.elapsed_time(hstates_end_event)) * 1e6)
+        # hstates_end_event.record()
+        # torch.cuda.synchronize()
+        # hidden_states_to_host_times.append((hstates_start_event.elapsed_time(hstates_end_event)) * 1e6)
 
+
+    try:
+        # snapshot memory after each trial
+        torch.cuda.memory._dump_snapshot(f"step_B_100_iterations.pickle")
+    except Exception as e:
+        print(f"Failed to capture memory snapshot")
+
+    # stop recording memory
+    torch.cuda.memory._record_memory_history(enabled=None)
+    
     # total end time for throughput calculation
-    total_end_event.record()
-    torch.cuda.synchronize()
+    # total_end_event.record()
+    # torch.cuda.synchronize()
 
-    time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
-    throughput = (1000 * batch_size) / (time_elapsed / 1000000000)
-    print("Throughput with batch size", batch_size, "(queries/s):", throughput)
+    # time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
+    # throughput = (1000 * batch_size) / (time_elapsed / 1000000000)
+    # print("Throughput with batch size", batch_size, "(queries/s):", throughput)
 
-    runtimes_file = 'step_B_runtime.csv'
-    gpu_transfer = 'step_B_transfer_to_gpu.csv'
-    embeddings_cpu_transfer = 'step_B_transfer_embeddings_to_cpu.csv'
-    hstates_cpu_transfer = 'step_B_transfer_hidden_states_to_cpu.csv'
+    # runtimes_file = 'step_B_runtime.csv'
+    # gpu_transfer = 'step_B_transfer_to_gpu.csv'
+    # embeddings_cpu_transfer = 'step_B_transfer_embeddings_to_cpu.csv'
+    # hstates_cpu_transfer = 'step_B_transfer_hidden_states_to_cpu.csv'
 
-    with open(runtimes_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(run_times)
+    # with open(runtimes_file, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(run_times)
 
-    with open(gpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(load_input_times)
+    # with open(gpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(load_input_times)
 
-    with open(embeddings_cpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(embeddings_to_host_times)
+    # with open(embeddings_cpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(embeddings_to_host_times)
 
-    with open(hstates_cpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(hidden_states_to_host_times)
+    # with open(hstates_cpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(hidden_states_to_host_times)
 
     print(f"vision_embedding shape is : {vision_embeddings.shape} | vision penultimate shape is: {vision_second_last_layer_hidden_states.shape}")
