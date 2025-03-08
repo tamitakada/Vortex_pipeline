@@ -56,7 +56,7 @@ if __name__=='__main__':
     # total_start_event = torch.cuda.Event(enable_timing=True)
     # total_end_event = torch.cuda.Event(enable_timing=True)
     # total start time for throughput calculation
-    total_start_event = time.perf_counter_ns()
+    # total_start_event = time.perf_counter_ns()
 
     total_runs = 100
     batch_size = 16
@@ -64,6 +64,9 @@ if __name__=='__main__':
     keys = list(queries.keys())
 
     num_keys = len(keys)
+
+    # start recording memory
+    torch.cuda.memory._record_memory_history()
 
     for _ in range(0, total_runs):
         query_embed_list = []
@@ -95,26 +98,35 @@ if __name__=='__main__':
         # load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6)
 
         # time before running model
-        model_start_event = time.perf_counter_ns()
+        # model_start_event = time.perf_counter_ns()
         ranking_dict = stepE.step_E_search(query, query_embed)
         # time after running model
-        model_end_event = time.perf_counter_ns()
+        # model_end_event = time.perf_counter_ns()
         # torch.cuda.synchronize()
-        run_times.append(model_end_event - model_start_event)
+        # run_times.append(model_end_event - model_start_event)
+
+    try:
+        # snapshot memory after each trial
+        torch.cuda.memory._dump_snapshot(f"step_E_100_iterations.pickle")
+    except Exception as e:
+        print(f"Failed to capture memory snapshot")
+
+    # stop recording memory
+    torch.cuda.memory._record_memory_history(enabled=None)
 
     # total end time for throughput calculation
-    total_end_event = time.perf_counter_ns()
+    # total_end_event = time.perf_counter_ns()
     # torch.cuda.synchronize()
-    time_elapsed=(total_end_event - total_start_event)
-    throughput = (total_runs * batch_size) / (time_elapsed / 1000000000)
-    print("Throughput with batch size", batch_size, "(queries/s):", throughput)
+    # time_elapsed=(total_end_event - total_start_event)
+    # throughput = (total_runs * batch_size) / (time_elapsed / 1000000000)
+    # print("Throughput with batch size", batch_size, "(queries/s):", throughput)
 
-    runtimes_file = 'step_E_runtime.csv'
+    # runtimes_file = 'step_E_runtime.csv'
     # gpu_transfer = 'step_E_transfer_to_gpu.csv'
 
-    with open(runtimes_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(run_times)
+    # with open(runtimes_file, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(run_times)
 
     # with open(gpu_transfer, mode='w', newline='') as file:
     #     writer = csv.writer(file)
