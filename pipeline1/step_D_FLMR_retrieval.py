@@ -170,16 +170,16 @@ class step_D_transformer_mapping:
         query_embeddings = torch.nn.functional.normalize(Q, p=2, dim=2).detach()
 
         # CUDA events for accurate profiling
-        mvcpu_start_event = torch.cuda.Event(enable_timing=True)
-        mvcpu_end_event = torch.cuda.Event(enable_timing=True)
+        # mvcpu_start_event = torch.cuda.Event(enable_timing=True)
+        # mvcpu_end_event = torch.cuda.Event(enable_timing=True)
 
         # time before transfer to CPU
-        mvcpu_start_event.record()
+        # mvcpu_start_event.record()
         query_embeddings = query_embeddings.cpu()
         # time after transfer to CPU
-        mvcpu_end_event.record()
-        torch.cuda.synchronize()
-        output_to_host_times.append((mvcpu_start_event.elapsed_time(mvcpu_end_event)) * 1e6)
+        # mvcpu_end_event.record()
+        # torch.cuda.synchronize()
+        # output_to_host_times.append((mvcpu_start_event.elapsed_time(mvcpu_end_event)) * 1e6)
 
         return query_embeddings
 
@@ -207,17 +207,20 @@ if __name__ =="__main__":
     output_to_host_times = []
 
     # CUDA events for accurate profiling
-    total_start_event = torch.cuda.Event(enable_timing=True)
-    total_end_event = torch.cuda.Event(enable_timing=True)
+    # total_start_event = torch.cuda.Event(enable_timing=True)
+    # total_end_event = torch.cuda.Event(enable_timing=True)
     # total start time for throughput calculation
-    total_start_event.record()
+    # total_start_event.record()
 
-    for i in range(1000):
-         # CUDA events for accurate profiling
-        mvgpu_start_event = torch.cuda.Event(enable_timing=True)
-        mvgpu_end_event = torch.cuda.Event(enable_timing=True)
-        model_start_event = torch.cuda.Event(enable_timing=True)
-        model_end_event = torch.cuda.Event(enable_timing=True)
+    # start recording memory
+    torch.cuda.memory._record_memory_history()
+
+    for i in range(100):
+        # CUDA events for accurate profiling
+        # mvgpu_start_event = torch.cuda.Event(enable_timing=True)
+        # mvgpu_end_event = torch.cuda.Event(enable_timing=True)
+        # model_start_event = torch.cuda.Event(enable_timing=True)
+        # model_end_event = torch.cuda.Event(enable_timing=True)
 
         dummy_ids = torch.randint(0, 10000, (bsize, query_length)).to(torch.int64)
         dummy_text_embeddings = torch.randn(bsize, query_length, late_interaction_size)
@@ -226,49 +229,58 @@ if __name__ =="__main__":
         dummy_tf_mapping_input_features = torch.randn(bsize, vision_penultimate_shape[1], text_hidden_size)
 
         # time before put to GPU
-        mvgpu_start_event.record()
+        # mvgpu_start_event.record()
         dummy_ids = dummy_ids.cuda()
         dummy_text_embeddings = dummy_text_embeddings.cuda()
         dummy_text_encoder_hidden_states = dummy_text_encoder_hidden_states.cuda()
         dummy_vision_embeddings = dummy_vision_embeddings.cuda()
         dummy_tf_mapping_input_features = dummy_tf_mapping_input_features.cuda()
         # time after put to GPU
-        mvgpu_end_event.record()
-        torch.cuda.synchronize()
-        load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6)
+        # mvgpu_end_event.record()
+        # torch.cuda.synchronize()
+        # load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6)
 
         # time before running model
-        model_start_event.record()
+        # model_start_event.record()
         query_embeddings = stepD.cross_attn_embedding(dummy_ids, dummy_text_embeddings, dummy_text_encoder_hidden_states, dummy_vision_embeddings, dummy_tf_mapping_input_features, output_to_host_times)
         # time after running model
-        model_end_event.record()
-        torch.cuda.synchronize()
-        run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
+        # model_end_event.record()
+        # torch.cuda.synchronize()
+        # run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
 
+    try:
+        # snapshot memory after each trial
+        torch.cuda.memory._dump_snapshot(f"step_D_100_iterations.pickle")
+    except Exception as e:
+        print(f"Failed to capture memory snapshot")
+
+    # stop recording memory
+    torch.cuda.memory._record_memory_history(enabled=None)
+    
     # total end time for throughput calculation
-    total_end_event.record()
-    torch.cuda.synchronize()
-    time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
-    throughput = (1000 * bsize) / (time_elapsed / 1000000000)
-    print("Throughput with batch size", bsize, "(queries/s):", throughput)
+    # total_end_event.record()
+    # torch.cuda.synchronize()
+    # time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
+    # throughput = (1000 * bsize) / (time_elapsed / 1000000000)
+    # print("Throughput with batch size", bsize, "(queries/s):", throughput)
 
     # subtract transfer time from runtime
-    run_times = numpy.subtract(run_times, output_to_host_times)
+    # run_times = numpy.subtract(run_times, output_to_host_times)
 
-    runtimes_file = 'step_D_runtime.csv'
-    gpu_transfer = 'step_D_transfer_to_gpu.csv'
-    cpu_transfer = 'step_D_transfer_to_cpu.csv'
+    # runtimes_file = 'step_D_runtime.csv'
+    # gpu_transfer = 'step_D_transfer_to_gpu.csv'
+    # cpu_transfer = 'step_D_transfer_to_cpu.csv'
 
-    with open(runtimes_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(run_times)
+    # with open(runtimes_file, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(run_times)
 
-    with open(gpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(load_input_times)
+    # with open(gpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(load_input_times)
 
-    with open(cpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(output_to_host_times)
+    # with open(cpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(output_to_host_times)
 
     print(f'query embedding shape is: {query_embeddings.shape}')
