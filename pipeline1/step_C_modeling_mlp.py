@@ -73,67 +73,79 @@ if __name__ == "__main__": # Bsize, vision_hidden_size[-2], vision_hidden_size[-
     bsize = 16
 
     # CUDA events for accurate profiling
-    total_start_event = torch.cuda.Event(enable_timing=True)
-    total_end_event = torch.cuda.Event(enable_timing=True)
+    # total_start_event = torch.cuda.Event(enable_timing=True)
+    # total_end_event = torch.cuda.Event(enable_timing=True)
     # total start time for throughput calculation
-    total_start_event.record()
+    # total_start_event.record()
+
+    # start recording memory
+    torch.cuda.memory._record_memory_history()
 
     for i in range(1000):
         # CUDA events for accurate profiling
-        mvgpu_start_event = torch.cuda.Event(enable_timing=True)
-        mvgpu_end_event = torch.cuda.Event(enable_timing=True)
-        model_start_event = torch.cuda.Event(enable_timing=True)
-        model_end_event = torch.cuda.Event(enable_timing=True)
-        mvcpu_start_event = torch.cuda.Event(enable_timing=True)
-        mvcpu_end_event = torch.cuda.Event(enable_timing=True)
+        # mvgpu_start_event = torch.cuda.Event(enable_timing=True)
+        # mvgpu_end_event = torch.cuda.Event(enable_timing=True)
+        # model_start_event = torch.cuda.Event(enable_timing=True)
+        # model_end_event = torch.cuda.Event(enable_timing=True)
+        # mvcpu_start_event = torch.cuda.Event(enable_timing=True)
+        # mvcpu_end_event = torch.cuda.Event(enable_timing=True)
 
         dummy_hidden_states = torch.randn(bsize, 256, 1024)
 
         # time before put to GPU
-        mvgpu_start_event.record()
+        # mvgpu_start_event.record()
         dummy_hidden_states = dummy_hidden_states.cuda()
         # time after put to GPU
-        mvgpu_end_event.record()
-        torch.cuda.synchronize()
-        load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6)
+        # mvgpu_end_event.record()
+        # torch.cuda.synchronize()
+        # load_input_times.append((mvgpu_start_event.elapsed_time(mvgpu_end_event)) * 1e6)
 
         # time before running model
-        model_start_event.record()
+        # model_start_event.record()
         output = stepc.stepC_output(dummy_hidden_states)
         # time after running model
-        model_end_event.record()
-        torch.cuda.synchronize()
-        run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
+        # model_end_event.record()
+        # torch.cuda.synchronize()
+        # run_times.append((model_start_event.elapsed_time(model_end_event)) * 1e6)
 
         # time before transfer to CPU
-        mvcpu_start_event.record()
+        # mvcpu_start_event.record()
         output.cpu()
         # time after transfer to CPU
-        mvcpu_end_event.record()
-        torch.cuda.synchronize()
-        output_to_host_times.append((mvcpu_start_event.elapsed_time(mvcpu_end_event)) * 1e6)
+        # mvcpu_end_event.record()
+        # torch.cuda.synchronize()
+        # output_to_host_times.append((mvcpu_start_event.elapsed_time(mvcpu_end_event)) * 1e6)
+
+    try:
+        # snapshot memory after each trial
+        torch.cuda.memory._dump_snapshot(f"step_C_100_iterations.pickle")
+    except Exception as e:
+        print(f"Failed to capture memory snapshot")
+
+    # stop recording memory
+    torch.cuda.memory._record_memory_history(enabled=None)
 
     # total end time for throughput calculation
-    total_end_event.record()
-    torch.cuda.synchronize()
-    time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
-    throughput = (1000 * bsize) / (time_elapsed / 1000000000)
-    print("Throughput with batch size", bsize, "(queries/s):", throughput)
+    # total_end_event.record()
+    # torch.cuda.synchronize()
+    # time_elapsed=(total_start_event.elapsed_time(total_end_event)) * 1e6
+    # throughput = (1000 * bsize) / (time_elapsed / 1000000000)
+    # print("Throughput with batch size", bsize, "(queries/s):", throughput)
 
-    runtimes_file = 'step_C_runtime.csv'
-    gpu_transfer = 'step_C_transfer_to_gpu.csv'
-    cpu_transfer = 'step_C_transfer_to_cpu.csv'
+    # runtimes_file = 'step_C_runtime.csv'
+    # gpu_transfer = 'step_C_transfer_to_gpu.csv'
+    # cpu_transfer = 'step_C_transfer_to_cpu.csv'
 
-    with open(runtimes_file, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(run_times)
+    # with open(runtimes_file, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(run_times)
 
-    with open(gpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(load_input_times)
+    # with open(gpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(load_input_times)
 
-    with open(cpu_transfer, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(output_to_host_times)
+    # with open(cpu_transfer, mode='w', newline='') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerow(output_to_host_times)
 
-    print(f"transformer mapping input feature shape is: {output.shape}")
+    # print(f"transformer mapping input feature shape is: {output.shape}")
