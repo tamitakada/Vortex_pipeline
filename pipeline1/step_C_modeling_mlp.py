@@ -81,7 +81,7 @@ if __name__ == "__main__": # Bsize, vision_hidden_size[-2], vision_hidden_size[-
     # start recording memory
     torch.cuda.memory._record_memory_history()
 
-    for i in range(1000):
+    for i in range(100):
         # CUDA events for accurate profiling
         # mvgpu_start_event = torch.cuda.Event(enable_timing=True)
         # mvgpu_end_event = torch.cuda.Event(enable_timing=True)
